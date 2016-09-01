@@ -31,19 +31,29 @@ void setup() {
   Bridge.begin();
  }
 
-void sendToHANA() {
+int sendToHANA() {
   Process p;
   String cmd;
+  String ret;
+  
 
   cmd =  "curl";
-  cmd += " -X POST";
+  cmd += " -k";
   cmd += " -H \"Content-Type: application/json\"";
-  cmd += " -d {\"title\":\"[DEMO] Low pressure alert\",\"description\":\"Low pressure on PCP18.\",\"author\":\"Prototipo\",\"priority\":\"10\",}";
+  cmd += " -X POST";
+  cmd += " -d '{\"title\":\"[DEMO] Low pressure alert!\",\"description\":\"Low pressure on PCP18.\",\"author\":\"Prototipo\",\"priority\":\"10\"}'";
   cmd += " https://innoweeks2016bebfc726c.us1.hana.ondemand.com/utilities/aegea/xs/alertInsert.xsjs";
 
-  p.runShellCommandAsynchronously(cmd);
-  //Serial.println(cmd);
+  Serial.println(cmd);
+  
+  p.runShellCommand(cmd);
 
+  while (p.available() > 0) {
+    char c = p.read();
+    ret += c;
+  }
+
+  return ret.substring(ret.indexOf(":")+1, ret.indexOf("}")).toInt();
 }
 
 bool getFromHANA() {
@@ -54,6 +64,7 @@ bool getFromHANA() {
 
 void justDoIt () {
   bool pumpItUp = false;
+  int hanaResponse;
 
   while (!hasFlow) {
     delay(1000); // Wait 1 second
@@ -61,7 +72,7 @@ void justDoIt () {
 
   // just checking...
   if (hasFlow) {
-    sendToHANA();
+    hanaResponse = sendToHANA();
 
     pumpItUp = getFromHANA();
     while (!pumpItUp) {
