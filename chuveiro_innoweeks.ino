@@ -4,6 +4,10 @@
 #define RELAY      8  // Relay pin
 #define LEDPIN    13  // Board led pin
 
+const String postAlertURL = "https://innoweeks2016bebfc726c.us1.hana.ondemand.com/utilities/aegea/xs/alertInsert.xsjs";
+const String getStatusAlertURL = "https://innoweeks2016bebfc726c.us1.hana.ondemand.com/utilities/aegea/xs/getAlertStatus.xsjs/?id=";
+
+
 volatile bool hasFlow; // flag to indicate flow
 int doIt = 1; // controls the execution of the demo
 
@@ -29,23 +33,22 @@ void setup() {
   Serial.begin(9600);
 
   Bridge.begin();
- }
+}
 
 int sendToHANA() {
   Process p;
   String cmd;
   String ret;
-  
 
-  cmd =  "curl";
-  cmd += " -k";
-  cmd += " -H \"Content-Type: application/json\"";
-  cmd += " -X POST";
-  cmd += " -d '{\"title\":\"[DEMO] Low pressure alert!\",\"description\":\"Low pressure on PCP18.\",\"author\":\"Prototipo\",\"priority\":\"10\"}'";
-  cmd += " https://innoweeks2016bebfc726c.us1.hana.ondemand.com/utilities/aegea/xs/alertInsert.xsjs";
+  cmd =  "curl ";
+  cmd += "-k ";
+  cmd += "-H \"Content-Type: application/json\" ";
+  cmd += "-X POST ";
+  cmd += "-d '{\"title\":\"[DEMO] Low pressure alert!\",\"description\":\"Low pressure on PCP18.\",\"author\":\"Prototipo\",\"priority\":\"10\"}' ";
+  cmd += postAlertURL;
 
   Serial.println(cmd);
-  
+
   p.runShellCommand(cmd);
 
   while (p.available() > 0) {
@@ -53,12 +56,34 @@ int sendToHANA() {
     ret += c;
   }
 
-  return ret.substring(ret.indexOf(":")+1, ret.indexOf("}")).toInt();
+  Serial.println(ret);
+
+  return ret.substring(ret.indexOf(":") + 1, ret.indexOf("}")).toInt();
 }
 
-bool getFromHANA() {
-  Serial.println("Resposta enviada");
-  delay(5000);
+bool getFromHANA(int alertId) {
+  Process p;
+  String cmd;
+  String ret;
+
+  cmd =  "curl ";
+  cmd += "-k ";
+  cmd += "-X GET ";
+  cmd += getStatusAlertURL;
+  cmd += alertId;
+
+  Serial.println(cmd);
+
+  p.runShellCommand(cmd);
+
+  while (p.available() > 0) {
+    char c = p.read();
+    ret += c;
+  }
+
+  Serial.println(ret);
+
+//  return ret.substring(ret.indexOf(":")+1, ret.indexOf("}")).toInt();
   return true;
 }
 
@@ -74,10 +99,10 @@ void justDoIt () {
   if (hasFlow) {
     hanaResponse = sendToHANA();
 
-    pumpItUp = getFromHANA();
+    pumpItUp = getFromHANA(hanaResponse);
     while (!pumpItUp) {
       delay(1000);
-      pumpItUp = getFromHANA();
+      pumpItUp = getFromHANA(hanaResponse);
     }
 
     if (pumpItUp) {
@@ -85,7 +110,7 @@ void justDoIt () {
       digitalWrite(RELAY, HIGH);
 
       // wait for 20 seconds
-      delay(20000);
+      delay(8000);
 
       // turn off the pump
       digitalWrite(RELAY, LOW);
