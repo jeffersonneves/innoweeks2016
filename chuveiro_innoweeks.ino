@@ -1,5 +1,7 @@
+#include <Process.h>
+
 #define FLOWSENSOR 2  // Flow sensor pin
-#define RELAY      7  // Relay pin
+#define RELAY      8  // Relay pin
 #define LEDPIN    13  // Board led pin
 
 volatile bool hasFlow; // flag to indicate flow
@@ -14,78 +16,86 @@ void setup() {
   hasFlow = false;
 
   pinMode(FLOWSENSOR, INPUT); //initializes digital pin 2 as an input
-  
+
   pinMode(RELAY, OUTPUT); //initializes relay pin as output
   digitalWrite(RELAY, LOW);
 
   pinMode(LEDPIN, OUTPUT);
   digitalWrite(LEDPIN, LOW);
 
+  attachInterrupt(digitalPinToInterrupt(FLOWSENSOR), flow, RISING); // the interrupt is attached
+  interrupts(); // enable interrupts
+
   Serial.begin(9600);
 
-  attachInterrupt(digitalPinToInterrupt(FLOWSENSOR), flow, RISING); // the interrupt is attached
+  Bridge.begin();
+ }
+
+void sendToHANA() {
+  Process p;
+  String cmd;
+
+  cmd =  "curl";
+  cmd += " -X POST";
+  cmd += " -H \"Content-Type: application/json\"";
+  cmd += " -d {\"title\":\"[DEMO] Low pressure alert\",\"description\":\"Low pressure on PCP18.\",\"author\":\"Prototipo\",\"priority\":\"10\",}";
+  cmd += " https://innoweeks2016bebfc726c.us1.hana.ondemand.com/utilities/aegea/xs/alertInsert.xsjs";
+
+  p.runShellCommandAsynchronously(cmd);
+  //Serial.println(cmd);
 
 }
 
-void loop() {
-
-  if (doIt){
-    justDoIt(); // start the process, since it's a single time execution demo, just one pass
-    doIt = 0;
-  }
-
-  digitalWrite(LEDPIN, HIGH); delay (250);
-  digitalWrite(LEDPIN, LOW);  delay (250);
-  digitalWrite(LEDPIN, HIGH); delay (250);
-  digitalWrite(LEDPIN, LOW);  delay (250);
-  digitalWrite(LEDPIN, HIGH); delay (1000);
-  digitalWrite(LEDPIN, LOW);  delay (1000);
+bool getFromHANA() {
+  Serial.println("Resposta enviada");
+  delay(5000);
+  return true;
 }
 
 void justDoIt () {
   bool pumpItUp = false;
 
   while (!hasFlow) {
-    sei();        // Enables interrupts
-    delay (1000); // Wait 1 second
-    cli();        // Disable interrupts
-    Serial.print("hasFlow is: ");
-    Serial.println((hasFlow?"true":"false"));
+    delay(1000); // Wait 1 second
   }
 
   // just checking...
-  if (false) {
-    //postAlarm();
+  if (hasFlow) {
+    sendToHANA();
 
-    //pumpItUp = getHANAResponse();
+    pumpItUp = getFromHANA();
     while (!pumpItUp) {
-      delay (500);
-      //pumpItUp = getHANAResponse();
+      delay(1000);
+      pumpItUp = getFromHANA();
     }
 
-    if (pumpItUp){
-
+    if (pumpItUp) {
       // turn on the pump
-      Serial.println("Liga a bomba");
       digitalWrite(RELAY, HIGH);
 
       // wait for 20 seconds
-      delay (20000);
+      delay(20000);
 
       // turn off the pump
-      Serial.println("Desliga a bomba");
       digitalWrite(RELAY, LOW);
     }
   }
 }
 
-void postAlarm() {
-  Serial.println("Postando Alarme");
-  delay (500);
+void loop() {
+
+  if (doIt) {
+    justDoIt(); // start the process, since it's a single time execution demo, just one pass
+    doIt = 0;
+  }
+  blinkLed();
 }
 
-bool getHANAResponse(){
-  Serial.println("Resposta enviada");
-  delay (5000);
-  return true;
+void blinkLed() {
+  digitalWrite(LEDPIN, HIGH); delay (250);
+  digitalWrite(LEDPIN, LOW);  delay (250);
+  digitalWrite(LEDPIN, HIGH); delay (250);
+  digitalWrite(LEDPIN, LOW);  delay (250);
+  digitalWrite(LEDPIN, HIGH); delay (1000);
+  digitalWrite(LEDPIN, LOW);  delay (1000);
 }
